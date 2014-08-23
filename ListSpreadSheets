@@ -1,0 +1,25 @@
+function doGet() {
+  var appUI = UiApp.createApplication();
+  var panelUI1 = appUI.createVerticalPanel().setTitle('Here is a list of your Spreadsheets');
+  var mySpreadsheets = DocsList.getFilesByType("spreadsheet");
+  //Create grid to hold the list of spreadsheets
+  var grid = appUI.createGrid(mySpreadsheets.length+1,2)
+      .setStyleAttribute('border', '1px solid black')
+      .setBorderWidth(1);
+  //Create the header row
+  grid.setWidget(0, 0, appUI.createLabel('Spreadsheet'))
+    .setWidget(0, 1, appUI.createLabel('URL'));
+  // Loop through the results and display the file name, and URL
+  for (var i = 0; i < mySpreadsheets.length; i++) {
+    grid.setWidget(i+1, 0, appUI.createLabel(mySpreadsheets[i].getName()));
+    grid.setWidget(i+1, 1, appUI.createLabel(mySpreadsheets[i].getUrl()));
+    // Logger.log(mySpreadsheets[i].getName() + ":" + mySpreadsheets[i].getType() + ":" +
+    //           mySpreadsheets[i].getUrl());
+  }
+  //add the grid/table to the panel
+  panelUI1.add(grid);
+  
+  //add the panel to the application
+  appUI.add(panelUI1);
+  return appUI;
+}
