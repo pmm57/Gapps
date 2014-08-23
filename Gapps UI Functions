@@ -1,3 +1,7 @@
+// global constants
+var LABEL_WIDTH="200";
+var TEXTBOX_WIDTH="400px";
+
 function makeLabel(app, text, id) {
   var lb = app.createLabel(text);
   if (id) lb.setId(id);
