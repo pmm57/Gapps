@@ -1,0 +1,143 @@
+// global constants
+var LABEL_WIDTH="200";
+var TEXTBOX_WIDTH="400";
+// Spreadsheet where all the movie data is stored
+var SPREADSHEET_ID = "0AhwV-fAXy-ZPdFRNdFFhSW9uRUFybWZkTnd5Sm1YUnc";
+
+/*
+* @return UiInstance Application created using UI Services
+*                    which includes all the widgets and callback handler hooks
+*
+*/
+function doGet(e) {
+  var app = UiApp.createApplication();
+  var vPanel = app.createVerticalPanel().setTitle("List My Movies").setId("ListMovies");
+  //create form widgets
+  var tblHeader = loadHeader(app);
+  var tblMovies = loadMovies(app);
+  var scroll = app.createScrollPanel(tblMovies)
+                  .setSize('900', '600')
+                  .setStyleAttribute('border', '1px solid black');
+  vPanel.add(tblHeader);
+  vPanel.add(scroll)
+  app.add(vPanel);
+  return app;
+}
+/*
+* @param container - UiInstance
+* @return - Vertical Panel of spreadsheet with column Hadings and scroll for body
+*/
+function loadSheet(app)
+  {
+  // Load the My Movie List into a Flex Table
+  var sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName("Movie List");
+  var rngMovies = sheet.getDataRange();
+  var myMovies = rngMovies.getValues();
+  // Calculate width for each column 
+  for (var row = 0; row<myMovies.length; row++)
+    {
+    for (var col = 0; col<myMovies[row].length; col++)
+      {
+      if ((col == 2) || (col == 6))
+        {
+        var aDate = myMovies[row][col];
+        if (!(aDate == ""))
+          {
+          var formattedDate = Utilities.formatDate(aDate, "Australia/ACT", "dd-MMM-yyyy");
+          tbl.setText(row, ptr, formattedDate);
+          }
+        ++ptr;
+        }
+      else if(!(col == 4))
+        {
+        tbl.setText(row, ptr, myMovies[row][col].toString());
+        ++ptr;
+        }
+      }
+    }
+  }
+/*
+* @param container - UiInstance
+* @return gridHeader - Load the Header lines from My Movie List into a Grid
+*/
+function loadHeader(container) {
+  var row = container.createGrid(1,8)
+                     .setBorderWidth(1);
+  // Load the My Movie List into a Flex Table
+  var sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName("Movie List");
+  var rngHeader = sheet.getRange(1,1,1,9);
+  var arrayHeader = rngHeader.getValues();
+  //Load data into grid cells
+  row.setText(0,0,arrayHeader[0][0].toString());
+  row.setStyleAttribute(0,0,"width","60px");
+  
+  row.setText(0,1,arrayHeader[0][1].toString());
+  row.setStyleAttribute(0,1,"width",arrayHeader[0][1].length +"ch");
+  
+  row.setText(0,2,arrayHeader[0][2].toString());
+  row.setStyleAttribute(0,2,"width",arrayHeader[0][2].length +"ch");
+  
+  row.setText(0,3,arrayHeader[0][3].toString());
+  row.setStyleAttribute(0,3,"width",arrayHeader[0][3].length +"ch");
+  
+  row.setText(0,4,arrayHeader[0][5].toString());
+  var widthpx = (arrayHeader[0][5].length * 7) + 5;
+  row.setStyleAttribute(0,4,"width",widthpx +"px");
+  
+  row.setText(0,5,arrayHeader[0][6].toString());
+  row.setStyleAttribute(0,5,"width",arrayHeader[0][6].length +"ch");
+  
+  row.setText(0,6,arrayHeader[0][7].toString());
+  row.setStyleAttribute(0,6,"width",arrayHeader[0][7].length +"ch");
+  
+  row.setText(0,7,arrayHeader[0][8].toString());
+  row.setStyleAttribute(0,7,"width",arrayHeader[0][8].length +"px");
+  
+  return row
+}
+/*
+* @param container - UiInstance
+* @return FlexTable - Load the My Movie List into a Flex Table
+*/
+function loadMovies(container) {
+  var tbl = container.createFlexTable()   //.setStyleAttribute('border', '1px solid black')
+      .setStyleAttribute('borderCollapse','collapse')
+      .setBorderWidth(1);
+  // Load the My Movie List into a Flex Table
+  var sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName("Movie List");
+  var rngMovies = sheet.getDataRange();
+  var myMovies = rngMovies.getValues();
+  //Logger.log(myMovies.length);
+  //Load data into table cells 
+  for (var row = 1; row<myMovies.length; row++)
+    {
+    var ptr = 0
+    for (var col = 0; col<myMovies[row].length; col++)
+      {
+      if ((col == 2) || (col == 6))
+        {
+        var aDate = myMovies[row][col];
+        if (!(aDate == ""))
+          {
+          var formattedDate = Utilities.formatDate(aDate, "Australia/ACT", "dd-MMM-yyyy");
+          tbl.setText(row, ptr, formattedDate);
+          }
+        ++ptr;
+        }
+      else if(!(col == 4))
+        {
+        tbl.setText(row, ptr, myMovies[row][col].toString());
+        ++ptr;
+        }
+      }
+    }
+  return tbl
+}
+/*
+* Helper functions
+*/
+function testloadMovies()
+  {
+  var app = UiApp.createApplication();
+  var tblMovies = loadHeader(app);
+  }
