@@ -1,0 +1,261 @@
+// global constants
+var LABEL_WIDTH="200";
+var TEXTBOX_WIDTH="400";
+// Spreadsheet where all the movie data is stored
+var SPREADSHEET_ID = "0AhwV-fAXy-ZPdFRNdFFhSW9uRUFybWZkTnd5Sm1YUnc";
+
+/*
+* @return UiInstance Application created using UI Services
+*                    which includes all the widgets and callback handler hooks
+*
+*/
+function doGet(e) {
+  var arrayColWidth = [20,0,0,0,0,0,0,0,0]
+  var app = UiApp.createApplication();
+  var vPanel = app.createVerticalPanel().setTitle("List My Movies").setId("ListMovies");
+  //create form widgets
+  // label for sorting message
+  // default mode is hidden
+  var lblSorting = app.createLabel();
+  lblSorting.setText("Sorting ....");
+  lblSorting.setStyleAttribute("fontSize", "12pt");
+  lblSorting.setStyleAttribute("font-weight", "normal");
+  lblSorting.setStyleAttribute("color","green");
+  lblSorting.setId("lblSorting");
+  lblSorting.setVisible(false);  
+  var hndSorting = app.createClientHandler().forTargets(lblSorting).setVisible(true)
+  var tblHeader = loadHeader(app, arrayColWidth, hndSorting);
+  var tblMovies = app.createFlexTable()   //.setStyleAttribute('border', '1px solid black')
+      .setStyleAttribute('borderCollapse','collapse')
+      .setCellPadding(0)
+      .setBorderWidth(0)
+      .setId("table");
+  var objSort = new MySortObj_("1:true");
+  var rows = [0];
+  loadMovies(tblMovies,objSort,rows);
+  Logger.log('function doGet: ' + rows)
+  //  Set Column widths
+  var width = 17
+  for (var ptr = 0; ptr<9; ptr++)
+    {
+    tblMovies.setColumnStyleAttribute(ptr, "width", arrayColWidth[ptr] + "px");
+    width = width + parseInt(arrayColWidth[ptr]);
+    }
+  // Add radio buttons in first column
+  var handlerBut = app.createServerHandler("handlerRadio_");
+  for (var ptr = 0; ptr<rows; ptr++)
+    {
+    var rBut = app.createRadioButton('Select') 
+                  .addClickHandler(handlerBut)
+                  .setId("Sel:" + (ptr + 2));
+    tblMovies.setWidget(ptr, 0, rBut);
+    }
+  //
+  vPanel.add(lblSorting);
+  vPanel.add(tblHeader);
+  var scroll = app.createScrollPanel(tblMovies)
+                  .setSize(width, '500')
+                  .setStyleAttribute('border', '0px solid black');
+  vPanel.add(scroll)
+  app.add(vPanel);
+  return app;
+}
+/*
+* @param container - UiInstance
+* @param arrayColWidth - array of column widths
+* @return gridHeader - Load the Header lines from My Movie List into a Grid
+*/
+function loadHeader(container,arrayColWidth,hndSorting) {
+  //
+  var row = container.createGrid(1,9)
+                     .setCellSpacing(0)
+                     .setCellPadding(0)
+                     .setBorderWidth(0);
+  //
+  var spreadSheet = SpreadsheetApp.openById(SPREADSHEET_ID)
+  // Clear the selected row
+  var rngSelRow = spreadSheet.getRangeByName("SelRow");
+  rngSelRow.setValue("Sel:0");
+  // Get Column Headings from first row
+  var sheet  = spreadSheet.getSheetByName("Movie List");
+  var rngHeader = sheet.getRange(1,1,1,9);
+  var arrayHeader = rngHeader.getValues();  // The Column Headings
+  var rngColumnWidths = spreadSheet.getRangeByName("ColWidthPxs");
+  var arrayColumnWidths = rngColumnWidths.getValues();  // The Column Widths
+  var handler = container.createServerHandler("handlerSort_");
+  //Load Headings into grid cells
+  var bSort = container.createButton("X")
+            .setSize(arrayColWidth[0] + "px", "30px")
+            .setStyleAttribute("marginLeft", "0px")
+            .setStyleAttribute("marginRight", "0px")
+            .setStyleAttribute("marginBottom", "0px")
+            .setStyleAttribute("paddingLeft", "0px")
+            .setStyleAttribute("paddingRight", "0px");
+  row.setWidget(0,0,bSort);
+  var ptr = 1
+  for (var col = 0; col<arrayHeader[0].length; col++)
+    {
+    if (arrayColumnWidths[col] > 0)
+      {
+      arrayColWidth[ptr] = arrayColumnWidths[col];
+      var bSort = container.createButton(arrayHeader[0][col].toString()).setId(col + 1).addClickHandler(handler)
+      //when the mouse button is pressed down - shows sorting....
+            .addClickHandler(hndSorting);
+      bSort.setSize(arrayColWidth[ptr] + "px", "30px")
+            .setStyleAttribute("marginLeft", "0px")
+            .setStyleAttribute("marginRight", "0px")
+            .setStyleAttribute("marginBottom", "0px")
+            .setStyleAttribute("paddingLeft", "0px")
+            .setStyleAttribute("paddingRight", "0px");
+      if (col == 0) // Indicate that sorted by overline
+        {
+        bSort.setStyleAttribute("textDecoration", "overline");
+        }
+      row.setWidget(0,ptr,bSort);
+      ++ptr;
+      }
+    }
+  return row
+}
+/*
+* @param tbl -  FlexTable - Load the My Movie List into a Flex Table
+* @param -objSort - A sort object containing the column in the sheet to sort by and sort order
+* @param rows - the numbre of rows added to flex table
+*/
+function loadMovies(tbl,objSort,rows) {
+  // Store the sort column and order
+  var userProperties = PropertiesService.getUserProperties();
+  userProperties.setProperty('SORT', objSort.column + ":" + objSort.ascending);
+  // Load the My Movie List into a Flex Table
+  var sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName("Movie List");
+  Logger.log('function loadMovies: ' + objSort.column + "-" + objSort.ascending);
+  var rngMovies = sheet.getRange(2, 1, sheet.getLastRow(), sheet.getLastColumn()).sort(objSort);
+  var myMovies = rngMovies.getValues();
+  rows[0] = myMovies.length - 1;
+  //Load data into table cells 
+  for (var row = 0; row<myMovies.length; row++)
+    {
+    var ptr = 1
+    for (var col = 0; col<myMovies[row].length; col++)
+      {
+      var formattedCell = myMovies[row][col].toString();
+      if ((col == 2) || (col == 6))
+        {
+        var aDate = myMovies[row][col];
+        if (!(aDate == ""))
+          {
+          formattedCell = Utilities.formatDate(aDate, "Australia/ACT", "dd-MMM-yyyy");
+          }
+        }
+      if ((col > 6) && (formattedCell == "0"))
+        {
+        formattedCell = ""
+        }
+      if (!(col == 4))
+        {
+        tbl.setText(row, ptr, formattedCell);
+        if (ptr > 1)
+          {
+          tbl.setStyleAttribute(row, ptr, "textAlign", "center");
+          }
+        ++ptr;
+        }
+      }
+    }
+}
+/*
+* Handler Functions
+*/
+/*
+*  When a click occurs on a Heading sort by that column
+*/
+function handlerSort_ (eventInfo)
+  {
+  var parameter = eventInfo.parameter;
+  var intSortBy = parseInt(parameter.source);
+  //
+  var app = UiApp.getActiveApplication();
+  var bSort = app.getElementById(parameter.source)
+  bSort.setStyleAttribute("textDecoration", "none");
+  var lblSorting = app.getElementById("lblSorting");
+  lblSorting.setVisible(false);  
+  // Get the current sort column and order
+  var userProperties = PropertiesService.getUserProperties();
+  var objSort = new MySortObj_(userProperties.getProperty('SORT'));
+  // Get the selected sort column
+  // If they are the same columns then change ascending
+  if (objSort.column == intSortBy)
+    {
+    bSort.setStyleAttribute("textDecoration", "none");
+    if (objSort.ascending)
+      {
+      objSort.ascending = false;
+      bSort.setStyleAttribute("textDecoration", "underline");
+      }
+    else
+      {
+      objSort.ascending = true;
+      bSort.setStyleAttribute("textDecoration", "overline");
+      }
+    }
+  else  // set new sort column and ascending to false
+    {
+    bSort.setStyleAttribute("textDecoration", "overline");
+    var bSort = app.getElementById(objSort.column)
+    bSort.setStyleAttribute("textDecoration", "none");
+    objSort.column = intSortBy;
+    objSort.ascending = true;
+    }
+  //
+  var tblMovies = app.getElementById("table")
+  var rows = [0];
+  loadMovies(tblMovies,objSort,rows);
+  return app;
+  }
+/*
+* 
+*/  
+function handlerRadio_ (eventInfo)
+  {
+  // Get the current selected row
+  var spreadSheet = SpreadsheetApp.openById(SPREADSHEET_ID)
+  var rngSelRow = spreadSheet.getRangeByName("SelRow");
+  var strSel = rngSelRow.getValue();
+  // Logger.log('function handlerRadio: SEL Now' + strSel);
+  //  Set the new value
+  var parameter = eventInfo.parameter;
+  var strButton = parameter.source;
+  // Logger.log('function handlerRadio: ' + strButton);
+  rngSelRow.setValue(strButton);
+  }
+/*
+* Class that is a range sort object
+*/
+function MySortObj_(strProperty) {
+  var i = strProperty.split(":");
+  this.column = parseInt(i[0]);
+  if (i[1] == "true")
+    {
+    this.ascending = true;
+    }
+  else
+    {
+    this.ascending = false;
+    }
+  }
+/*
+* Helper functions
+*/
+function testloadMovies()
+  {
+  var app = UiApp.createApplication();
+  var arrayColWidth = [0,0,0,0,0,0,0,0]
+  var tblHeader = loadHeader(app, arrayColWidth);
+  }
+function testMySOrtObj()
+  {
+  var userProperties = PropertiesService.getUserProperties();
+  var objSort = new MySortObj_(userProperties.getProperty('SORT'));
+  Logger.log(objSort.column)
+  
+  }
