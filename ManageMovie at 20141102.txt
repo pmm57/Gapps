@@ -1,0 +1,696 @@
+// global constants
+var LABEL_WIDTH="200";
+var TEXTBOX_WIDTH="400";
+// Spreadsheet where all the movie data is stored
+var SPREADSHEET_ID = "0AhwV-fAXy-ZPdFRNdFFhSW9uRUFybWZkTnd5Sm1YUnc";
+
+/*
+* @return UiInstance Application created using UI Services
+*                    which includes all the widgets and callback handler hooks
+*
+*/
+function doGet(e) {
+ var app = UiApp.createApplication();
+ //create form widgets
+  createManageMovieForm_(app)
+  return app;
+}
+/*
+* @param UiInstance Private method which creates all the widgets in the Manage Movie Screen
+*/
+function createManageMovieForm_(container) {
+  createSearchForm_(container);
+  var resultPanel = createResultForm_(container);
+  var detailPanel = createDetailForm_(container);
+  var handler = container.createClientHandler().forTargets(resultPanel).setVisible(false)
+              .forTargets(detailPanel).setVisible(false);
+  container.getElementById("txtSearch").addClickHandler(handler);
+  container.getElementById("btnMyMovies").addClickHandler(handler);
+  container.getElementById("btnIMDB").addClickHandler(handler);
+  // create a Horizontal Panel to hold Results and Movie Details
+  var h2Panel = container.createHorizontalPanel();
+  h2Panel.add(resultPanel);
+  h2Panel.add(detailPanel);
+  container.add(h2Panel);
+}
+/*
+* @param UiInstance 
+*  create the search string panel
+*/
+function createSearchForm_(container) {
+try
+  {
+  // create a Vertical Panel
+  var vPanel = container.createVerticalPanel();
+  vPanel.setWidth("810");
+  vPanel.setStyleAttribute("fontSize", "12pt");
+  vPanel.setStyleAttribute("borderBottom", "solid");
+  vPanel.setStyleAttribute("borderBottomWidth", "1");
+  vPanel.setId("searchpanel");
+  
+  var h1Panel = createInputBox_(container, "Search for a Movie Title", "txtSearch", true);
+  // submit search
+  var h1bpanel = container.createHorizontalPanel();
+  h1bpanel.setHorizontalAlignment(UiApp.HorizontalAlignment.CENTER)
+  var btnSearch = container.createButton();
+  btnSearch.setText("Search for Movies");
+  decorateLabel_(btnSearch, "0px");
+  h1bpanel.add(btnSearch);
+  
+  // label for search message
+  // default mode is hidden
+  var lblSearching = container.createLabel();
+  lblSearching.setText("Searching ....");
+  lblSearching.setStyleAttribute("fontSize", "12pt");
+  lblSearching.setStyleAttribute("font-weight", "normal");
+  lblSearching.setStyleAttribute("color","green");
+  lblSearching.setId("lblSearching");
+  lblSearching.setVisible(false);  
+  // label for nothing found message
+  // default mode is hidden
+  var lblNoMatch = container.createLabel();
+  lblNoMatch.setText("No Matches Found");
+  lblNoMatch.setStyleAttribute("fontSize", "12pt");
+  lblNoMatch.setStyleAttribute("font-weight", "normal");
+  lblNoMatch.setStyleAttribute("color","red");
+  lblNoMatch.setId("lblNoMatch");
+  lblNoMatch.setVisible(false);
+  // create a Horizontal Panel to hold these messages
+  var h1mPanel = container.createHorizontalPanel();
+  h1mPanel.setWidth("800");
+  h1mPanel.setId("h1mpanel");
+  h1mPanel.add(lblSearching);
+  h1mPanel.add(lblNoMatch);
+  
+  var name = 'My Movies';
+  var radioValue = container.createTextBox();
+  radioValue.setId("radioValue").setName("radioValue").setVisible(false).setText(name);
+  var handler = container.createClientHandler().forTargets(radioValue).setText(name)
+              .forTargets(lblNoMatch).setVisible(false)
+              .forTargets(btnSearch).setEnabled(true);
+  var rbtn = container.createRadioButton('radio',name)
+                      .addValueChangeHandler(handler)
+                      .setValue(true)
+                      .setId("btnMyMovies");
+  decorateLabel_(rbtn, "4px");
+  h1bpanel.add(rbtn);
+  var name = 'IMDB';
+  var handler = container.createClientHandler().forTargets(radioValue).setText(name)
+              .forTargets(lblNoMatch).setVisible(false)
+              .forTargets(btnSearch).setEnabled(true);
+  var rbtn = container.createRadioButton('radio',name).addValueChangeHandler(handler).setId("btnIMDB");
+  decorateLabel_(rbtn, "4px");
+  h1bpanel.add(rbtn);
+  h1bpanel.add(radioValue);
+
+  // submit handlers
+  //when the mouse button is pressed down - disable button and shows matching....
+  var hndSearching = container.createClientHandler().forEventSource().setEnabled(false).forTargets(lblSearching).setVisible(true);
+  btnSearch.addClickHandler(hndSearching);
+  var hndSearch = container.createServerClickHandler('searchHandler_');
+  hndSearch.addCallbackElement(vPanel);
+  btnSearch.addMouseUpHandler(hndSearch);
+  // when the txtSearch gets focus then set messages invisible and enable button
+  var handler = container.createClientHandler().forTargets(lblSearching).setVisible(false).forTargets(lblNoMatch).setVisible(false)
+          .forTargets(btnSearch).setEnabled(true);
+  container.getElementById("txtSearch").addFocusHandler(handler);
+  // add all the widgets to the application
+  vPanel.add(h1Panel);
+  vPanel.add(h1bpanel);
+  vPanel.add(h1mPanel);
+  container.add(vPanel);
+  }
+catch(error)
+  {
+    Logger.log('function createSearchForm_: ' + error);
+  }
+}
+/*
+* @param UiInstance 
+* returns a Vertical Panel containing the Result Form
+*
+*/
+function createResultForm_(container) {
+try
+  {
+
+  // response is another panel with search results
+  // create a Vertical Panel
+  var vPanel = container.createVerticalPanel();
+  vPanel.setWidth("400");
+  vPanel.setStyleAttribute("fontSize", "12pt");
+  vPanel.setStyleAttribute("borderRight", "solid");
+  vPanel.setStyleAttribute("borderRightWidth", "1");
+  vPanel.setId("resultpanel");
+  vPanel.setVisible(false);
+
+  // create all the widget
+  // each label is 200px and Text Box is 400px
+  var lblSearchedFor = container.createLabel().setText("Your search for : : found : : Movies");
+  lblSearchedFor.setWidth(400);
+  lblSearchedFor.setId("searchedfor");
+  decorateLabel_(lblSearchedFor,"0px");
+
+  // list box to hold the results of the search
+  var lstResult = container.createListBox(false).setId("lstMovies").setName("selMovie");
+  var hndMovieDisplay = container.createServerMouseHandler('displayMovie_').addCallbackElement(vPanel);
+  lstResult.addClickHandler(hndMovieDisplay)
+
+  // label for instruction
+  var lblDo = container.createLabel().setText("Click a Title to Display");
+  lblDo.setWidth(LABEL_WIDTH);
+  decorateLabel_(lblDo, "0px");
+
+  vPanel.add(lblSearchedFor);
+  vPanel.add(lblDo);
+  vPanel.add(lstResult);
+
+  return vPanel;
+
+  }
+catch(error)
+  {
+    Logger.log('function createResultForm_: ' + error);
+  }
+}
+/*
+* @param UiInstance 
+* returns a Vertical Panel containing the Movie Detail Form
+*
+*/
+function createDetailForm_(container) {
+try
+  {
+  // Logger.log("Started createDetailForm")
+  // response is another panel with movie displayed
+  // create a Vertical Panel
+  var vMovie = container.createVerticalPanel();
+  vMovie.setWidth("4000");
+  vMovie.setStyleAttribute("fontSize", "12pt");
+  vMovie.setId("detailpanel");
+  vMovie.setVisible(false);
+    
+  // Create a Grid to hold the Movie Data
+  var gridMovie = container.createGrid(10, 2).setId("gridMovie")
+       .setCellSpacing(10)
+       .setText(0, 0, "Movie Title")
+       .setText(1, 0, "Release Year")
+       .setText(2, 0, "Date added")
+       .setText(3, 0, "Status")
+       .setText(4, 0, "IMDB Id")
+       .setText(5, 0, "Show Link")
+       .setText(6, 0, "Watched")
+       .setText(7, 0, "Watched Date")
+       .setText(8, 0, "Davids Rating")
+       .setText(9, 0, "Margarets Rating")
+  vMovie.add(gridMovie);
+  // Poster
+  var imgPoster = container.createImage("http://www.google.com/logos/googleburn.jpg");
+  imgPoster.setId("imgPoster");
+  vMovie.add(imgPoster);
+
+  return vMovie;
+
+  }
+catch(error)
+  {
+    Logger.log('function createDetailForm_: ' + error);
+  }
+}
+
+/*
+* @param UiInstance
+* @param lblString - String for a label
+* @param txtBoxName - String for a TExt box
+* return a Horizontal widget containing a Label and a Text Box
+*/
+function createInputBox_(container, lblString, txtBoxName, blnFocus) {
+  var txt = container.createTextBox();
+  txt.setWidth(TEXTBOX_WIDTH);
+  txt.setMaxLength(80);
+  txt.setName(txtBoxName);
+  txt.setId(txtBoxName);
+  if (blnFocus) {
+    txt.setFocus(true)
+  }
+  var hp = container.createHorizontalPanel();
+  hp.add(makeLabel_(container, lblString));
+  hp.add(txt);
+  return hp
+}
+
+/*
+* @param UiInstance
+* @param lblString - String for a label
+* @param txtBoxName - String for a TExt box
+* return a Horizontal widget containing a Label and a Text Box
+*/
+function createDateBox_(container, lblString, txtBoxName, blnFocus) {
+  var hp = container.createHorizontalPanel();
+  hp.add(makeLabel_(container, lblString));
+  hp.add(makeDateBox_(container, txtBoxName, blnFocus));
+  return hp
+}
+/*
+* @param UiInstance
+* @param lblString - String for a label
+* return a Label
+*/
+function makeLabel_(container, lblString) {
+
+  var lbl = container.createLabel().setText(lblString);
+  lbl.setWidth(LABEL_WIDTH);
+  lbl.setStyleAttribute("fontSize","12pt");
+  lbl.setStyleAttribute("margin-top","4px");
+  lbl.setStyleAttribute("font-weight","bold");
+  lbl.setStyleAttribute("color","black");
+  return lbl
+}
+/*
+* @param UiInstance
+* @param txtBoxName - String for a TExt box
+* return a DateBox
+*/
+function makeDateBox_(container, txtBoxName, blnFocus) {
+  var txt = container.createDateBox();
+  txt.setWidth(100);
+  txt.setName(txtBoxName);
+  txt.setId(txtBoxName);
+  txt.setFormat(UiApp.DateTimeFormat.DATE_SHORT);
+  if (blnFocus) {
+    txt.setFocus(true)
+  }
+  return txt
+}
+/*
+* @param Event Callback method which is called when a user clicks on Submit.
+*              This method name was provided to the ServerClickHandler class.
+*
+*/
+function searchHandler_(e) {
+try
+  {
+  var array = [];
+  var app = UiApp.getActiveApplication();
+  var strSearch = e.parameter.txtSearch;
+  var strWhere = e.parameter.radioValue;
+  Logger.log (strWhere);
+  if (strWhere == "My Movies") 
+    {
+    searchMyTitles_(strSearch,array);
+    }
+  else 
+    {
+    searchIMDBTitles_(strSearch,array);
+    }
+  if (array.length == 0)
+    {
+    var msg = app.getElementById("lblNoMatch");
+    msg.setVisible(true);
+    }
+  else
+    {
+    showMatches_(strSearch,app,array);
+    }
+  var msg = app.getElementById("lblSearching");
+  msg.setVisible(false);
+  app.close();
+  return app;
+  }
+catch(error)
+  {
+    Logger.log('function searchHandler_: ' + error);
+  }
+}
+
+/*
+* @param UiInstance Response widgets are attached to the UiInstance page.
+* @param strSearch Search data entered by the user
+*
+*/
+function showMatches_(strSearch,container,array) {
+  // Show the form
+  var panel = container.getElementById("resultpanel") ;
+  panel.setVisible(true);
+
+  // response is another panel with search results
+
+  // create all the widget
+  // each label is 200px and Text Box is 400px
+  var lblSearchedFor = container.getElementById("searchedfor")
+  lblSearchedFor.setText("Your search for " + strSearch.trim() + " found " + array.length + " movies!");
+
+  // list box to hold the results of the search
+  var lstResult = container.getElementById("lstMovies");
+  lstResult.clear();
+  for (var i = 0; i < array.length; i++)    {
+    var row = array[i];
+    lstResult.addItem(row[0],row[1]);
+  }
+  if (array.length > 20) {lstResult.setVisibleItemCount(20);}
+  else {lstResult.setVisibleItemCount(array.length + 1);}
+
+}
+/*
+* @param Event Callback method which is called when a user clicks on A movie in A LsitBox.
+*              This method name was provided to the ServerClickHandler class.
+*
+*/
+function displayMovie_(e) {
+try
+  {
+  var app = UiApp.getActiveApplication();
+  // get values of ListBox
+  var ptrRow = e.parameter.selMovie;
+  // Logger.log(ptrRow);
+  showMovie_(ptrRow,app);
+  // Logger.log("Returned from showMovie");
+  app.close();
+  return app;
+  }
+catch(error)
+  {
+    Logger.log('function displayMovie_: ' + error);
+  }
+}
+
+/*
+*  @param ptrRow - Pointer to Row in "My Movies" to display
+*  @param app    - UI Instance
+*/
+function showMovie_(ptrRow,container) {
+try
+  {
+  // show the form
+  var mPanel = container.getElementById("detailpanel").setVisible(true);
+  
+  // Clear the Grid  Movie Data
+  container.getElementById("gridMovie")
+       .setText(0, 1, "")
+       .setText(1, 1, "")
+       .setText(2, 1, "")
+       .setText(3, 1, "")
+       .setText(4, 1, "")
+       .setText(5, 1, "")
+       .setText(6, 1, "")
+       .setText(7, 1, "")
+       .setText(8, 1, "")
+       .setText(9, 1, "")
+  container.getElementById("imgPoster").setVisible(false);
+  
+  var amovie = new MyMovie_();
+  // if selected value is string then get IMDB movie
+  // Logger.log(typeof ptrRow + " - " + ptrRow);
+  if (/^tt/.test(ptrRow))
+    {
+    amovie.getIMDBMovie(ptrRow);
+    }
+  else
+    {
+    amovie.getMyMovie(ptrRow);
+    }
+  if (amovie.Response == "False")
+    {
+    container.getElementById("gridMovie")
+       .setText(1, 0, "Movie Not Found");
+    return
+    }
+    
+  //  Setup input fields
+  var dateAdded = makeDateBox_(container, "chgDateAdded", true);
+  dateAdded.setValue(amovie.Added);
+  var urlAnchor = container.createAnchor("Link",amovie.getLink());
+  var dateWatched = makeDateBox_(container, "chgDateWatched", false);
+  if (!(amovie.WatchedDate == ""))
+    {
+    dateWatched.setValue(amovie.WatchedDate);
+    }
+  // Load Movie Data
+  container.getElementById("gridMovie")
+       .setText(0, 1, amovie.Title)
+       .setText(1, 1, amovie.Released)
+       .setWidget(2, 1, dateAdded)
+       .setText(3, 1, amovie.CollectionStatus)
+       .setText(4, 1, amovie.IMDBId)
+       .setWidget(5, 1, urlAnchor)
+       .setText(6, 1, amovie.Watched)
+       .setWidget(7, 1, dateWatched)
+       .setText(8, 1, amovie.RateDavid)
+       .setText(9, 1, amovie.RateMargaret)
+  // Poster Image URL
+  var imgurl = amovie.getIMDBPoster()
+  // Logger.log(imgurl);
+  var imgPoster = container.createImage(imgurl).setId("imgPoster");
+  mPanel.add(imgPoster);
+  
+  }
+catch(error)
+  {
+    Logger.log('function showMovie_: ' + error);
+  }
+}
+/*
+* Search spreadseet for the string 
+*
+* @param strSearch - Title to search for
+* @param arrayTitles - An Array to Return the Titles of the found movies
+*/
+function searchMyTitles_(strSearch,arrayTitles) {
+
+  // Get the movie spreadsheet
+  Logger.log("Search My Titles");
+  var sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName("Movie List");
+  var pattern = new RegExp(strSearch,"i");
+  var ptrCol = getColumn_("Movie Title", sheet);
+  var endRow = sheet.getLastRow() - 1;
+  var rngTitles = sheet.getRange(2,ptrCol,endRow);
+  var Titles = rngTitles.getValues();
+  Logger.log(Titles.length);
+  var ptrMatchs = arrayFind_(Titles, pattern);
+  Logger.log(ptrMatchs.length);
+  for (var i = 0; i < ptrMatchs.length; i++ )
+    {
+    var ptrRow = ptrMatchs[i];
+    var rowValue = Titles[ptrRow][0];
+    ptrRow = ptrRow + 2 // adjust for spreadsheet row numbering
+    Logger.log(rowValue + " - " + ptrRow);
+    var row = []
+    row[0] = rowValue;
+    row[1] = ptrRow;
+    arrayTitles.push(row);
+    }
+}
+/*
+* Search IMDB service for the string 
+*
+* @param strSearch - Title to search for
+* @param arrayTitles - An Array to Return the Titles of the found movies
+*/
+function searchIMDBTitles_(strSearch,arrayTitles) {
+  Logger.log("Search IMDB");
+  var response = UrlFetchApp.fetch("http://www.omdbapi.com/?s=" + strSearch);
+  var data = JSON.parse(response);
+  if (data.Response == "False")
+    {
+    return
+    }
+  for (var i = 0; i<data.Search.length - 1; i++)
+    {
+    var Movie = data.Search[i]
+    // Logger.log ("Title:" + Movie.Title + "  Year:" + Movie.Year + "   IMDBId:" + Movie.imdbID);
+    var row = []
+    row[0] = Movie.Title;
+    row[1] = Movie.imdbID;
+    arrayTitles.push(row);
+    }
+}
+/*
+* Class that represents an individual MyMovie_ from the "Movie List" sheet
+*
+*/
+function MyMovie_() {
+  this.RowID = "";
+  this.Title = "";
+  this.Released = "";
+  this.Added = "";
+  this.CollectionStatus = "";
+  this.IMDBId = "";
+  this.Watched = "";
+  this.WatchedDate = "";
+  this.RateDavid = "";
+  this.RateMargaret = "";
+  this.Response = "";
+
+  /*
+   * Retrieves the Movie_ for the row
+   *
+   * @param ptrRow - the row of the Movie to get.
+   */
+  this.getMyMovie = function(ptrRow) {
+    var sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName("Movie List");
+    var range = sheet.getRange(ptrRow,1,1,9);
+    var values = range.getValues();
+    this.RowID = ptrRow;
+    this.Title = values[0][0];
+    this.Released = values[0][1];
+    this.Added = values[0][2];
+    this.CollectionStatus = values[0][3];
+    this.IMDBId = values[0][4];
+    this.Watched = values[0][5];
+    this.WatchedDate = values[0][6];
+    this.RateDavid = values[0][7];
+    this.RateMargaret = values[0][8];
+    }
+
+  /*
+   * Retrieves the IMDB movie for IMDBId
+   *
+   * @param IMDBId - IMDB Identifier.
+   */
+  this.getIMDBMovie = function(IMDBId) {
+    var response = UrlFetchApp.fetch("http://www.omdbapi.com/?i=" + IMDBId);
+    var Movie = JSON.parse(response);
+    // Logger.log ("Title:" + Movie.Title + "  Year:" + Movie.Year + "   IMDBId:" + Movie.imdbID);
+    this.RowID = 0;
+    this.Title = Movie.Title;
+    this.Released = Movie.Year;
+    this.Added = "";
+    this.CollectionStatus = "";
+    this.IMDBId = Movie.imdbID;
+    this.Watched = "";
+    this.WatchedDate = "";
+    this.RateDavid = "";
+    this.RateMargaret = "";
+    this.Response = Movie.Response;
+    }
+   /*
+   * Retrieves the IMDB movie poster
+   *
+   * @param .
+   */
+  this.getIMDBPoster = function() {
+    var IMDBId = this.IMDBId;
+    // IMDBId may contain a URL not a tt*
+    if (!(/^tt/.test(IMDBId)))
+      {
+      var newstr = IMDBId.replace(/^http:\/\/www.imdb.com\/title\//,"");
+      if (!(/^tt/.test(newstr)))
+        {
+        return
+        }
+        IMDBId = newstr.replace(/\//,"");
+      }
+    var response = UrlFetchApp.fetch("http://www.omdbapi.com/?i=" + IMDBId);
+    var Movie = JSON.parse(response);
+    return Movie.Poster;
+    }
+   /*
+   * Retrieves a link to Movie Page
+   *
+   * @param .
+   */
+  this.getLink = function() {
+    var IMDBId = this.IMDBId;
+    Logger.log(IMDBId);
+    // IMDBId may contain a tt* not a URL
+    if ((/^tt/.test(IMDBId)))
+      {
+      var newstr = "http://www.imdb.com/title/" + IMDBId;
+      return newstr;
+      }
+    else
+      {
+       return IMDBId;
+      }
+  }
+}
+
+/*
+* Helper function to find strings in an array 
+*
+* @param - arrayIn - two dimensional array, only look in first
+* @param - pattern - a regular expression
+* return - an array of indexs that match
+*
+*/
+function arrayFind_(arrayIn, pattern) {
+  var returnArray = false;
+  for (i=0; i<arrayIn.length; i++) {
+    var rowValue = arrayIn[i][0];
+    var matches = rowValue.match(pattern);
+    if (matches != null) {
+        if (!returnArray) { returnArray = [] }
+        returnArray.push(i);
+      }
+    }
+  return returnArray;
+}
+/*
+* Helper method to decorate a label.
+*
+* @param Label Label which needs to be decorated.
+*/
+function decorateLabel_(label,margin) {
+   label.setStyleAttribute("fontSize","12pt");
+   label.setStyleAttribute("margin-top",margin);
+   label.setStyleAttribute("font-weight","bold");
+   label.setStyleAttribute("color","black");
+}
+
+/*
+* Helper method to decorate a label using secondary style.
+*
+* @param Label Label which needs to be decorated.
+*/
+function decorateLabel1_(label) {
+   label.setStyleAttribute("fontSize","8pt");
+   label.setStyleAttribute("margin-top","2px");
+   label.setStyleAttribute("font-weight","normal");
+   label.setStyleAttribute("color","gray");
+}
+
+/*
+* Helper method to get the correct column
+* 
+* @param Header - The column header name
+* @param Sheet - The Sheet object 
+* return       - the Column number
+*/
+function getColumn_(Header, Sheet)
+{
+  for (var fromCol = 1; fromCol < Sheet.getLastColumn() + 1; fromCol++ )
+    {
+    var rowHeader = Sheet.getRange(1,fromCol,1).getValue();
+    if (rowHeader == Header)
+      {
+      return fromCol;
+      }
+    }
+  Browser.msgBox(Header + " Not Found")
+  return 0;
+}
+/*
+* Below are all the tests
+*/
+function testSearch() {
+  var array = [];
+  var strSearch = "alien";
+  searchIMDBTitles_(strSearch,array);
+  Logger.log(array.length);
+}
+
+function testGetMovie() {
+  var amovie = new MyMovie_();
+  amovie.getMyMovie(39);
+  var url = amovie.getLink();
+  Logger.log(url);
+  Logger.log("Title:"+amovie.Title);
+  Logger.log(amovie.Released);
+  Logger.log(amovie.Added);
+  Logger.log(amovie.IMDBId);
+  Logger.log(amovie.Watched);
+  Logger.log(amovie.WatchedDate);
+  Logger.log("Collection:"+amovie.CollectionStatus);
+  Logger.log("Response:"+amovie.Response);
+
+}
